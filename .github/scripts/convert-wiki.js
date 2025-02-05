@@ -12,14 +12,33 @@ const md = new MarkdownIt({
 const WIKI_DIR = 'wiki';
 const OUTPUT_DIR = '_site';
 const TEMPLATE_PATH = '.github/templates/page.html';
+// Get repository name from environment variable or default to 'kimuwiki'
+const REPO_NAME = process.env.GITHUB_REPOSITORY ? process.env.GITHUB_REPOSITORY.split('/')[1] : 'kimuwiki';
+const BASE_URL = `/${REPO_NAME}`;
 
 // Ensure output directory exists
 fs.ensureDirSync(OUTPUT_DIR);
 
-// Read the HTML template
-const template = fs.readFileSync(TEMPLATE_PATH, 'utf8');
+// Custom renderer for links to handle internal wiki links
+const defaultRender = md.renderer.rules.link_open || function(tokens, idx, options, env, self) {
+  return self.renderToken(tokens, idx, options);
+};
 
-// Process all markdown files
+md.renderer.rules.link_open = function(tokens, idx, options, env, self) {
+  const token = tokens[idx];
+  const href = token.attrs.find(attr => attr[0] === 'href');
+  
+  if (href && href[1].endsWith('.md')) {
+    // Convert internal .md links to .html links with correct base path
+    href[1] = BASE_URL + '/' + href[1].replace('.md', '.html');
+  } else if (href && !href[1].startsWith('http') && !href[1].startsWith('#')) {
+    // Add base path to other internal links
+    href[1] = BASE_URL + href[1];
+  }
+  
+  return defaultRender(tokens, idx, options, env, self);
+};
+
 // Generate sidebar navigation structure
 const generateSidebar = (files) => {
   const navigation = [];
@@ -32,7 +51,7 @@ const generateSidebar = (files) => {
     
     navigation.push({
       title: attributes.title || path.basename(file, '.md'),
-      url: '/' + file.replace('.md', '.html'),
+      url: BASE_URL + '/' + file.replace('.md', '.html'),
       order: attributes.order || 999
     });
   }
@@ -40,6 +59,7 @@ const generateSidebar = (files) => {
   return navigation.sort((a, b) => a.order - b.order);
 };
 
+// Process all markdown files
 const processWikiFiles = async () => {
   const files = await fs.readdir(WIKI_DIR);
   
@@ -48,6 +68,9 @@ const processWikiFiles = async () => {
   const sidebarHtml = sidebarNav
     .map(item => `<li><a href="${item.url}">${item.title}</a></li>`)
     .join('\n');
+  
+  // Read the HTML template
+  const template = fs.readFileSync(TEMPLATE_PATH, 'utf8');
   
   for (const file of files) {
     if (!file.endsWith('.md')) continue;
@@ -62,7 +85,8 @@ const processWikiFiles = async () => {
     const finalHtml = template
       .replace('{{title}}', attributes.title || path.basename(file, '.md'))
       .replace('{{content}}', htmlContent)
-      .replace('{{sidebar}}', sidebarHtml);
+      .replace('{{sidebar}}', sidebarHtml)
+      .replace(/{{base_url}}/g, BASE_URL);  // Add this for any assets/resources
     
     // Write to output directory
     const outputPath = path.join(OUTPUT_DIR, file.replace('.md', '.html'));
