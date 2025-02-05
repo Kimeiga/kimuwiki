@@ -13,6 +13,7 @@ const WIKI_DIR = 'wiki';
 const OUTPUT_DIR = '_site';
 const TEMPLATE_PATH = '.github/templates/page.html';
 // Get repository name from environment variable or default to 'kimuwiki'
+const REPO_OWNER = process.env.GITHUB_REPOSITORY ? process.env.GITHUB_REPOSITORY.split('/')[0] : 'kimusan';
 const REPO_NAME = process.env.GITHUB_REPOSITORY ? process.env.GITHUB_REPOSITORY.split('/')[1] : 'kimuwiki';
 const BASE_URL = `/${REPO_NAME}`;
 
@@ -46,10 +47,8 @@ const generateSidebar = (files) => {
   for (const file of files) {
     if (!file.endsWith('.md')) continue;
     
-    // Skip special GitHub wiki files
-    if (file.startsWith('_')) continue;
-    // Skip Home.md since we'll add it manually
-    if (file.toLowerCase() === 'home.md') continue;
+    // Skip special GitHub wiki files and Home.md
+    if (file.startsWith('_') || file.toLowerCase() === 'home.md') continue;
     
     const content = fs.readFileSync(path.join(WIKI_DIR, file), 'utf8');
     const { attributes } = frontMatter(content);
@@ -91,7 +90,10 @@ const processWikiFiles = async () => {
       .replace(/\{\{title\}\}/g, attributes.title || file.replace('.md', '').replace(/-/g, ' '))
       .replace('{{content}}', htmlContent)
       .replace('{{sidebar}}', sidebarHtml)
-      .replace(/{{base_url}}/g, BASE_URL);  // Add this for any assets/resources
+      .replace(/\{\{base_url\}\}/g, BASE_URL)
+      .replace(/\{\{repo_owner\}\}/g, REPO_OWNER)
+      .replace(/\{\{repo_name\}\}/g, REPO_NAME)
+      .replace(/\{\{wiki_page\}\}/g, file.replace('.md', ''));
     
     // Write to output directory
     const outputPath = path.join(OUTPUT_DIR, file.replace('.md', '.html'));
