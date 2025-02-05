@@ -46,11 +46,16 @@ const generateSidebar = (files) => {
   for (const file of files) {
     if (!file.endsWith('.md')) continue;
     
+    // Skip special GitHub wiki files
+    if (file.startsWith('_')) continue;
+    // Skip Home.md since we'll add it manually
+    if (file.toLowerCase() === 'home.md') continue;
+    
     const content = fs.readFileSync(path.join(WIKI_DIR, file), 'utf8');
     const { attributes } = frontMatter(content);
     
     navigation.push({
-      title: attributes.title || path.basename(file, '.md'),
+      title: attributes.title || file.replace('.md', '').replace(/-/g, ' '),
       url: BASE_URL + '/' + file.replace('.md', '.html'),
       order: attributes.order || 999
     });
@@ -83,7 +88,7 @@ const processWikiFiles = async () => {
     
     // Insert into template
     const finalHtml = template
-      .replace('{{title}}', attributes.title || path.basename(file, '.md'))
+      .replace(/\{\{title\}\}/g, attributes.title || file.replace('.md', '').replace(/-/g, ' '))
       .replace('{{content}}', htmlContent)
       .replace('{{sidebar}}', sidebarHtml)
       .replace(/{{base_url}}/g, BASE_URL);  // Add this for any assets/resources
