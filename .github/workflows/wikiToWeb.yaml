@@ -1,37 +1,40 @@
-name: Sync Wiki Pages
+name: Wiki to Website Sync
 
 on:
-  push:
-    branches:
-      - main
+  gollum:  # Triggers on wiki changes
+  workflow_dispatch:  # Allows manual trigger
   schedule:
-    - cron: "0 0 * * *"  # every day at midnight UTC; adjust as needed
+    - cron: '0 0 * * *'  # Daily sync at midnight
 
 jobs:
-  build:
+  sync-wiki:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-          submodules: true  # if your wiki is added as a submodule
+          fetch-depth: 0
 
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '2.7'  # or your required Ruby version
-
-      - name: Install dependencies
-        run: bundle install
-
-      - name: Sync Wiki Pages
-        run: bundle exec rake wiki
-
-      - name: Commit and push changes
+      - name: Checkout Wiki
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git add .
-          git commit -m "Automated wiki sync" || echo "No changes to commit"
-          git push
+          git clone "https://github.com/$GITHUB_REPOSITORY.wiki.git" wiki
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: |
+          npm install markdown-it
+          npm install front-matter
+          npm install fs-extra
+
+      - name: Convert Wiki to Website
+        run: node .github/scripts/convert-wiki.js
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: _site
